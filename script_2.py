@@ -54,8 +54,9 @@ print(model.state_dict())
 loss_fn = torch.nn.L1Loss()
 optimizer = torch.optim.SGD(model.parameters(), lr=0.001)
 
-epochs = 5000
+epochs = 50
 for epoch in range(epochs):
+
     model.train() # set the model to training mode (gradient computation is enabled)
 
     # 1. Forward pass: Compute predicted y by passing x to the model
@@ -63,7 +64,6 @@ for epoch in range(epochs):
    
     # 2. Compute and print loss
     loss = loss_fn(Y_pred, Y_train)
-    print('Epoch:', epoch, 'Loss:', loss.item())
 
     # 3. Zero gradients, perform a backward pass, and update the weights.
     optimizer.zero_grad()
@@ -73,6 +73,13 @@ for epoch in range(epochs):
 
     # 5. Update the weights
     optimizer.step()
+
+    model.eval() # set the model to evaluation mode (gradient computation is disabled)
+    with torch.inference_mode():
+        Y_pred = model(X_test)
+        test_loss = loss_fn(Y_pred, Y_test)
+    
+    print(f"Epoch {epoch} | Loss: {loss} | Test loss: {test_loss.item()}")
 
 
 
