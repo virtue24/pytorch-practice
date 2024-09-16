@@ -5,6 +5,7 @@ from torchvision import datasets, transforms
 import matplotlib.pyplot as plt
 
 import numpy as np
+import copy
 
 # Set the path to your local images
 data_dir = './data/images'
@@ -41,28 +42,13 @@ class Autoencoder(nn.Module):
             nn.LeakyReLU(0.05),
             nn.Conv2d(32, 64, 3, stride=2, padding=1),  # 128 -> 64
             nn.LeakyReLU(0.05),
-            nn.Conv2d(64, 128, 3, stride=2, padding=1),  # 64 -> 32
+            nn.Conv2d(64, 128, 3, stride=2, padding=1),  # 64 -> 32 (latent space)
             nn.LeakyReLU(0.05),
-            nn.Conv2d(128, 256, 3, stride=2, padding=1),  # 32 -> 16
-            nn.LeakyReLU(0.05),
-            nn.Conv2d(256, 512, 3, stride=2, padding=1),  # 16 -> 8
-            nn.LeakyReLU(0.05),
-            nn.Conv2d(512, 1024, 3, stride=2, padding=1),  # 8 -> 4
-            nn.LeakyReLU(0.05),
-            nn.Conv2d(1024, 1024, 4),  # 4 -> 1 (Bottleneck)
-            nn.LeakyReLU(0.05)
+
         )
         
         # Decoder
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(1024, 1024, 4, stride=2),  # 1 -> 4
-            nn.LeakyReLU(0.05),
-            nn.ConvTranspose2d(1024, 512, 3, stride=2, padding=1, output_padding=1),  # 4 -> 8
-            nn.LeakyReLU(0.05),
-            nn.ConvTranspose2d(512, 256, 3, stride=2, padding=1, output_padding=1),  # 8 -> 16
-            nn.LeakyReLU(0.05),
-            nn.ConvTranspose2d(256, 128, 3, stride=2, padding=1, output_padding=1),  # 16 -> 32
-            nn.LeakyReLU(0.05),
+        self.decoder = nn.Sequential(          
             nn.ConvTranspose2d(128, 64, 3, stride=2, padding=1, output_padding=1),  # 32 -> 64
             nn.LeakyReLU(0.05),
             nn.ConvTranspose2d(64, 32, 3, stride=2, padding=1, output_padding=1),  # 64 -> 128
@@ -77,7 +63,8 @@ class Autoencoder(nn.Module):
         x = self.encoder(x)
         x = self.decoder(x)
         return x
-    
+
+
 # Set device (GPU if available)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Using device: {device}')
@@ -93,16 +80,42 @@ optimizer = optim.AdamW(model.parameters(),
                         weight_decay=1e-5)
 
 # Training loop
-num_epochs = 100
+num_epochs = 250
 outputs = []
+
+
+def stochastically_cut_out(image=None, max_cut_size=64, cut_prob=0.25):
+    # Randomly decide whether to apply the cut-out augmentation
+    if np.random.rand() > cut_prob:
+        return image
+    
+    # image is expected to be a tensor of shape (batch_size, channels, height, width)
+    _, c, h, w = image.shape  # Get the dimensions of the input image
+
+    # Calculate the mean color for each channel (across the whole image)
+    mean_color = image.mean(dim=[2, 3], keepdim=True)  # Mean over height and width
+
+    # Randomly select a position and size for the cut-out area
+    cut_h = np.random.randint(0, max_cut_size)  # Random height of the cut-out
+    cut_w = np.random.randint(0, max_cut_size)  # Random width of the cut-out
+    y = np.random.randint(0, h - cut_h)  # Random starting y position
+    x = np.random.randint(0, w - cut_w)  # Random starting x position
+
+    # Set the selected section to the mean color
+    image[:, :, y:y+cut_h, x:x+cut_w] = mean_color
+
+    print(f'Cut-out applied at position (y, x): ({y}, {x}), size (h, w): ({cut_h}, {cut_w})')
+    return image
 
 for epoch in range(num_epochs):
     for (img, _) in data_loader:
         # Move images to the device
+        cutted_img = stochastically_cut_out(image=copy.deepcopy(img), max_cut_size=32, cut_prob=0.5)
         img = img.to(device)
+        cutted_img = cutted_img.to(device)
 
         # Forward pass
-        recon = model(img)
+        recon = model(cutted_img)
         loss = criterion(recon, img)
 
         # Backward pass and optimization
