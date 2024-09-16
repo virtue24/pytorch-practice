@@ -26,48 +26,51 @@ dataset = datasets.ImageFolder(root=data_dir, transform=transform)
 
 class Autoencoder(nn.Module):
     def __init__(self):
-        super().__init__()
+        super(Autoencoder, self).__init__()
+        
         # Encoder
         self.encoder = nn.Sequential(
-            nn.Conv2d(3, 16, 3, stride=2, padding=1, dilation = 2),  # 512 -> 256
+            nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1),   # conv1_1: 512 -> 512
             nn.LeakyReLU(0.05),
-            nn.Conv2d(16, 32, 3, stride=2, padding=1, dilation = 2),  # 256 -> 128
+            nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1),  # conv1_2: 512 -> 256
             nn.LeakyReLU(0.05),
-            nn.Conv2d(32, 64, 3, stride=2, padding=1, dilation = 2),  # 128 -> 64
+            
+            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1), # conv2_1: 256 -> 256
             nn.LeakyReLU(0.05),
-            nn.Conv2d(64, 128, 3, stride=2, padding=1, dilation = 2),  # 64 -> 32
+            nn.Conv2d(128, 128, kernel_size=3, stride=2, padding=1),# conv2_2: 256 -> 128
             nn.LeakyReLU(0.05),
-            nn.Conv2d(128, 256, 3, stride=2, padding=1, dilation = 2),  # 32 -> 16
+
+            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),# conv3_1: 128 -> 128
             nn.LeakyReLU(0.05),
-            nn.Conv2d(256, 512, 3, stride=2, padding=1, dilation = 2),  # 16 -> 8
+            nn.Conv2d(256, 256, kernel_size=3, stride=2, padding=1),# conv3_2: 128 -> 64
             nn.LeakyReLU(0.05),
-            nn.Conv2d(512, 512, 3, stride=2, padding=1, dilation = 2),  # 8 -> 4 (Relaxed Bottleneck)
-            nn.LeakyReLU(0.05)
+            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),# conv3_3: 64 -> 64
+            nn.LeakyReLU(0.05),
+
+            nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1),# conv4_1: 64 -> 64
+            nn.LeakyReLU(0.05),          
         )
         
         # Decoder
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(512, 512, 3, stride=2, padding=1, output_padding=1),  # 4 -> 8
+        self.decoder = nn.Sequential(           
+
+            nn.ConvTranspose2d(512, 256, kernel_size=3, stride=1, padding=1), # deconv3_3: 64 -> 64
             nn.LeakyReLU(0.05),
-            nn.ConvTranspose2d(512, 256, 3, stride=2, padding=1, output_padding=1),  # 8 -> 16
+            nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1, output_padding=1), # deconv3_2: 64 -> 128
             nn.LeakyReLU(0.05),
-            nn.ConvTranspose2d(256, 128, 3, stride=2, padding=1, output_padding=1),  # 16 -> 32
+            nn.ConvTranspose2d(128, 64, kernel_size=3, stride=1, padding=1),  # deconv2_2: 128 -> 128
             nn.LeakyReLU(0.05),
-            nn.ConvTranspose2d(128, 64, 3, stride=2, padding=1, output_padding=1),  # 32 -> 64
+
+            nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2, padding=1, output_padding=1), # deconv1_2: 128 -> 256
             nn.LeakyReLU(0.05),
-            nn.ConvTranspose2d(64, 32, 3, stride=2, padding=1, output_padding=1),  # 64 -> 128
-            nn.LeakyReLU(0.05),
-            nn.ConvTranspose2d(32, 16, 3, stride=2, padding=1, output_padding=1),  # 128 -> 256
-            nn.LeakyReLU(0.05),
-            nn.ConvTranspose2d(16, 3, 3, stride=2, padding=1, output_padding=1),  # 256 -> 512
+            nn.ConvTranspose2d(64, 3, kernel_size=3, stride=2, padding=1, output_padding=1),  # deconv1_1: 256 -> 512
             nn.Tanh()  # Output scaled to [-1, 1]
         )
-
-    def forward(self, x):
-        x = self.encoder(x)
-        x = self.decoder(x)
-        return x
     
+    def forward(self, x):
+        encoded = self.encoder(x)
+        decoded = self.decoder(encoded)
+        return decoded
 
 # Initialize the model and load the saved weights
 model = Autoencoder().to(device)
@@ -180,7 +183,7 @@ while True:
     grey_scale_relative_difference = relative_difference.mean(axis=2)  # Calculate mean along the channel dimension
     mean_value = np.mean(grey_scale_relative_difference)
     std_value = np.std(grey_scale_relative_difference)
-    adjusted_image = grey_scale_relative_difference - (mean_value+2*std_value) # Subtract the mean value
+    adjusted_image = grey_scale_relative_difference - (mean_value+0*std_value) # Subtract the mean value
 
 
     # Apply the conditions:

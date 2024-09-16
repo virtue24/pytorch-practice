@@ -22,7 +22,7 @@ transform = transforms.Compose([
 dataset = datasets.ImageFolder(root=data_dir, transform=transform)
 
 data_loader = torch.utils.data.DataLoader(dataset=dataset,
-                                          batch_size=4,
+                                          batch_size=1,
                                           shuffle=True)
 
 # Check if data loaded properly
@@ -33,37 +33,51 @@ print('Image tensor shape:', images.shape)
 
 class Autoencoder(nn.Module):
     def __init__(self):
-        super().__init__()
+        super(Autoencoder, self).__init__()
+        
         # Encoder
         self.encoder = nn.Sequential(
-            nn.Conv2d(3, 16, 3, stride=2, padding=1),  # 512 -> 256
+            nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1),   # conv1_1: 512 -> 512
             nn.LeakyReLU(0.05),
-            nn.Conv2d(16, 32, 3, stride=2, padding=1),  # 256 -> 128
+            nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1),  # conv1_2: 512 -> 256
             nn.LeakyReLU(0.05),
-            nn.Conv2d(32, 64, 3, stride=2, padding=1),  # 128 -> 64
+            
+            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1), # conv2_1: 256 -> 256
             nn.LeakyReLU(0.05),
-            nn.Conv2d(64, 128, 3, stride=2, padding=1),  # 64 -> 32 (latent space)
+            nn.Conv2d(128, 128, kernel_size=3, stride=2, padding=1),# conv2_2: 256 -> 128
             nn.LeakyReLU(0.05),
 
+            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),# conv3_1: 128 -> 128
+            nn.LeakyReLU(0.05),
+            nn.Conv2d(256, 256, kernel_size=3, stride=2, padding=1),# conv3_2: 128 -> 64
+            nn.LeakyReLU(0.05),
+            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),# conv3_3: 64 -> 64
+            nn.LeakyReLU(0.05),
+
+            nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1),# conv4_1: 64 -> 64
+            nn.LeakyReLU(0.05),          
         )
         
         # Decoder
-        self.decoder = nn.Sequential(          
-            nn.ConvTranspose2d(128, 64, 3, stride=2, padding=1, output_padding=1),  # 32 -> 64
+        self.decoder = nn.Sequential(           
+
+            nn.ConvTranspose2d(512, 256, kernel_size=3, stride=1, padding=1), # deconv3_3: 64 -> 64
             nn.LeakyReLU(0.05),
-            nn.ConvTranspose2d(64, 32, 3, stride=2, padding=1, output_padding=1),  # 64 -> 128
+            nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1, output_padding=1), # deconv3_2: 64 -> 128
             nn.LeakyReLU(0.05),
-            nn.ConvTranspose2d(32, 16, 3, stride=2, padding=1, output_padding=1),  # 128 -> 256
+            nn.ConvTranspose2d(128, 64, kernel_size=3, stride=1, padding=1),  # deconv2_2: 128 -> 128
             nn.LeakyReLU(0.05),
-            nn.ConvTranspose2d(16, 3, 3, stride=2, padding=1, output_padding=1),  # 256 -> 512
+
+            nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2, padding=1, output_padding=1), # deconv1_2: 128 -> 256
+            nn.LeakyReLU(0.05),
+            nn.ConvTranspose2d(64, 3, kernel_size=3, stride=2, padding=1, output_padding=1),  # deconv1_1: 256 -> 512
             nn.Tanh()  # Output scaled to [-1, 1]
         )
-
+    
     def forward(self, x):
-        x = self.encoder(x)
-        x = self.decoder(x)
-        return x
-
+        encoded = self.encoder(x)
+        decoded = self.decoder(encoded)
+        return decoded
 
 # Set device (GPU if available)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -80,7 +94,7 @@ optimizer = optim.AdamW(model.parameters(),
                         weight_decay=1e-5)
 
 # Training loop
-num_epochs = 250
+num_epochs = 50
 outputs = []
 
 
@@ -96,8 +110,8 @@ def stochastically_cut_out(image=None, max_cut_size=64, cut_prob=0.25):
     mean_color = image.mean(dim=[2, 3], keepdim=True)  # Mean over height and width
 
     # Randomly select a position and size for the cut-out area
-    cut_h = np.random.randint(0, max_cut_size)  # Random height of the cut-out
-    cut_w = np.random.randint(0, max_cut_size)  # Random width of the cut-out
+    cut_h = np.random.randint(max_cut_size//10, max_cut_size)  # Random height of the cut-out
+    cut_w = np.random.randint(max_cut_size//10, max_cut_size)  # Random width of the cut-out
     y = np.random.randint(0, h - cut_h)  # Random starting y position
     x = np.random.randint(0, w - cut_w)  # Random starting x position
 
