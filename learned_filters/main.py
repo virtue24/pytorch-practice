@@ -11,8 +11,7 @@ train_image_np = np.array(cv2.resize(cv2.imread('train.png'), IMAGE_SIZE))
 test_image_np = np.array(cv2.resize(cv2.imread('test.png'), IMAGE_SIZE))
 
 FILTER_SIZE = int(train_image_np.shape[0] * FILTER_RATIO), int(train_image_np.shape[1] * FILTER_RATIO)
-print('FILTER_SIZE:', FILTER_SIZE)
-
+print(f"FILTER_SIZE: {FILTER_SIZE}")
 
 kernels = []
 for i in range(0, train_image_np.shape[0], 1):
