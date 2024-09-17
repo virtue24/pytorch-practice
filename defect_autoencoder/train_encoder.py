@@ -11,7 +11,7 @@ import defect_generator
 IMAGE_SIZE = (572, 572)
 MASK_SIZE = (388, 388)
 
-NUMBER_OF_DEFECTED_IMAGES = 50
+NUMBER_OF_DEFECTED_IMAGES = 100
 TRAIN_PERCENTAGE = 0.8
 BASE_IMAGE_NP = np.array(cv2.imread('base_image.png'))
 
@@ -27,7 +27,7 @@ train_dataset_tensor = [(torch.tensor(img / 255.0).permute(2, 0, 1).unsqueeze(0)
 val_dataset_tensor = [(torch.tensor(img / 255.0).permute(2, 0, 1).unsqueeze(0).float(), torch.tensor(mask / 255.0).permute(2, 0, 1).unsqueeze(0).float()) for img, mask in val_dataset]
 
 LEARNING_RATE = 3e-4
-EPOCHS = 100
+EPOCHS = 20
 MODEL_SAVE_PATH = "unet.pth"
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
