@@ -143,31 +143,76 @@ def add_salt_and_pepper_noise(frame: np.ndarray = None, defect_class=3, amount=0
     
     return noisy_frame, defect_label
 
-def draw_ellipse_on_frame(frame: np.ndarray = None, defect_class=4, R_range=[0, 255], G_range=[0, 255], B_range=[0, 255], angle_range=[0, 360], axes_length_range=[10, 100], thickness_range=[1, 10], opacity_range=[0.1, 1.0]):
-    """Draws an ellipse on the frame with a specified opacity."""
+def draw_ellipse_on_frame(
+    frame: np.ndarray = None,
+    defect_class=4,
+    R_range=[0, 255],
+    G_range=[0, 255],
+    B_range=[0, 255],
+    angle_range=[0, 360],
+    axes_length_range=[10, 100],
+    thickness_range=[1, 10],
+    opacity_range=[0.1, 1.0]
+):
+    """Draws an ellipse on the frame with a specified opacity and updates the label accordingly."""
+    # Randomly generate RGB values, thickness, opacity, and angle
     R = random.randint(R_range[0], R_range[1])
     G = random.randint(G_range[0], G_range[1])
     B = random.randint(B_range[0], B_range[1])
     angle = random.randint(angle_range[0], angle_range[1])
-    axes_length = (random.randint(axes_length_range[0], axes_length_range[1]),
-                   random.randint(axes_length_range[0], axes_length_range[1]))
+    axes_length = (
+        random.randint(axes_length_range[0], axes_length_range[1]),
+        random.randint(axes_length_range[0], axes_length_range[1])
+    )
     thickness = random.randint(thickness_range[0], thickness_range[1])
     opacity = random.uniform(opacity_range[0], opacity_range[1])
-    
-    center = (random.randint(0, frame.shape[1]), random.randint(0, frame.shape[0]))
-    
+
+    # Generate random center point for the ellipse
+    center = (
+        random.randint(axes_length[0], frame.shape[1] - axes_length[0]),
+        random.randint(axes_length[1], frame.shape[0] - axes_length[1])
+    )
+
+    # Create an overlay to draw the ellipse
     overlay = frame.copy()
-    cv2.ellipse(overlay, center, axes_length, angle, 0, 360, (R, G, B), thickness)
-    
+
+    # Draw the ellipse on the overlay
+    cv2.ellipse(
+        overlay,
+        center,
+        axes_length,
+        angle,
+        0,
+        360,
+        (B, G, R),  # OpenCV uses BGR format
+        thickness
+    )
+
+    # Blend the overlay with the original frame using the specified opacity
     frame = cv2.addWeighted(overlay, opacity, frame, 1 - opacity, 0)
-    
-    # YOLO format calculations
-    defect_nx_center = center[0] / frame.shape[1]
-    defect_ny_center = center[1] / frame.shape[0]
-    defect_nwidth = 2 * axes_length[0] / frame.shape[1]
-    defect_nheight = 2 * axes_length[1] / frame.shape[0]
-    defect_label = yolo_format(defect_class, defect_nx_center, defect_ny_center, defect_nwidth, defect_nheight)
-    
+
+    # Calculate the rotated rectangle that bounds the ellipse
+    # Approximate the ellipse with a polyline (set of points)
+    ellipse_pts = cv2.ellipse2Poly(center, axes_length, angle, 0, 360, 1)
+
+    # Get the axis-aligned bounding rectangle of the rotated ellipse
+    x, y, w, h = cv2.boundingRect(ellipse_pts)
+
+    # Ensure the bounding box is within the frame boundaries
+    x_min = max(0, x)
+    y_min = max(0, y)
+    x_max = min(frame.shape[1], x + w)
+    y_max = min(frame.shape[0], y + h)
+
+    # Calculate normalized center coordinates and dimensions for YOLO format
+    defect_nx_center = ((x_min + x_max) / 2) / frame.shape[1]
+    defect_ny_center = ((y_min + y_max) / 2) / frame.shape[0]
+    defect_nwidth = (x_max - x_min) / frame.shape[1]
+    defect_nheight = (y_max - y_min) / frame.shape[0]
+    defect_label = yolo_format(
+        defect_class, defect_nx_center, defect_ny_center, defect_nwidth, defect_nheight
+    )
+
     return frame, defect_label
 
 def add_blurred_region(frame: np.ndarray = None, defect_class=5, kernel_size_range=[5, 31]):
@@ -401,14 +446,14 @@ def add_fog_effect(frame: np.ndarray = None, defect_class=13, fog_density=0.5):
     return frame, defect_label
 
 def draw_copy_paste_on_frame(
-    frame: np.ndarray = None,
-    defect_class=0,
-    R_range=[0, 255],
-    G_range=[0, 255],
-    B_range=[0, 255],
-    ncut_length_range=[0.05, 0.2],
-    ncopy_region=[0.0, 0.0, 1.0, 1.0]
-):
+        frame: np.ndarray = None,
+        defect_class=0,
+        R_range=[0, 255],
+        G_range=[0, 255],
+        B_range=[0, 255],
+        ncut_length_range=[0.05, 0.2],
+        ncopy_region=[0.0, 0.0, 1.0, 1.0]
+    ):
     """Draws a cut on the frame by copying and pasting a region."""
     # Random color components (currently unused)
     R = random.randint(R_range[0], R_range[1])
