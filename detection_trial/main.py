@@ -9,10 +9,10 @@ import torch
 import defect_generators
 
 DATASET_FOLDER_NAME = "dataset" # Never change this
-NUMBER_OF_DEFECTS = 240 
+NUMBER_OF_DEFECTS = 1960 
 IMAGE_ZOOM_REGION = [0.3, 0.3, 0.7, 0.7]
 DESIRED_IMAGE_SIZE = (640, 640)
-DEFECTS_PER_IMAGE_RANGE = [1, 4+1] # last number is exclusive
+DEFECTS_PER_IMAGE_RANGE = [1, 3+1] # last number is exclusive
 
 def paste_image_and_label(image:np.ndarray = None, name_prefix:str = None, label = "", dataset_folder_name:str =None):
     sample_uuid = str(uuid.uuid4())
@@ -119,8 +119,7 @@ def recreate_dataset_images_and_labels(dataset_folder_name=None, number_of_defec
 
         cropped_image = image[y_min:y_max, x_min:x_max]
         resized_image = cv2.resize(cropped_image, DESIRED_IMAGE_SIZE)
-
-        cv2.imwrite(os.path.join(DATASET_TEST_DEFECT_IMAGES_DATASET_FOLDER_PATH, str(uuid.uuid4())), resized_image)
+        cv2.imwrite(DATASET_TEST_DEFECT_IMAGES_DATASET_FOLDER_PATH / (str(uuid.uuid4())+".jpg"), resized_image)
     
     # crop and resize the test good images
     test_good_images = [cv2.imread(image_path) for image_path in base_test_good_image_paths]
@@ -140,31 +139,40 @@ def recreate_dataset_images_and_labels(dataset_folder_name=None, number_of_defec
         cropped_image = image[y_min:y_max, x_min:x_max]
         resized_image = cv2.resize(cropped_image, DESIRED_IMAGE_SIZE)
 
-        cv2.imwrite(os.path.join(DATASET_TEST_GOOD_IMAGES_DATASET_FOLDER_PATH, str(uuid.uuid4()), resized_image))       
-              
+        cv2.imwrite(DATASET_TEST_GOOD_IMAGES_DATASET_FOLDER_PATH / (str(uuid.uuid4())+".jpg"), resized_image)
+
     # add background images to the dataset
     for image in base_images:
         paste_image_and_label(image = image, name_prefix = "background", label = "", dataset_folder_name = dataset_folder_name)
     
     # add defect images to the dataset
     DEFECT_GENERATORS = [
-        [True, defect_generators.draw_line_on_frame, {"defect_class": 0, "R_range": [75, 255], "G_range": [75, 255], "B_range": [75, 255], "thickness_range": [2, 13], "opacity_range": [0.5, 1.0]}],
-        [True, defect_generators.draw_circle_on_frame, {"defect_class": 0, "R_range": [75, 255], "G_range": [75, 255], "B_range": [75, 255], "thickness_range": [2, 13], "opacity_range": [0.5, 1.0], "radius_range": [10, 50]}],
+        #[True, defect_generators.draw_line_on_frame, {"defect_class": 0, "R_range": [75, 255], "G_range": [75, 255], "B_range": [75, 255], "thickness_range": [2, 13], "opacity_range": [0.5, 1.0]}],
+        [True, defect_generators.draw_cocentric_lines_on_frame, {"defect_class": 0, "R_range": [0, 75], "G_range": [0, 255], "B_range": [0, 75], "thickness_range": [1, 7], "opacity_range": [0.1, 1.0], "num_lines_range": [5, 25], "random_offset_range":[-8, 8], "rotation_angle_range":[-3, 3], "bbox_range":[0.15, 0.4], "line_length_range":[0.05, 0.3]}],
+        [True, defect_generators.draw_circle_on_frame, {"defect_class": 0, "R_range": [0, 75], "G_range": [0, 75], "B_range": [0, 75], "thickness_range": [2, 13], "opacity_range": [0.5, 0.9], "radius_range": [5, 30], "infill_probability": 0.9}],
         [True, defect_generators.draw_copy_paste_on_frame, {"defect_class": 0, "R_range": [75, 255], "G_range": [75, 255], "B_range": [75, 255], "ncut_length_range": [0.05, 0.2], "ncopy_region": [0.33,0.1, 0.66, 0.9]}],
-        [True, defect_generators.draw_rectangle_on_frame, {"defect_class": 0, "R_range": [75, 255], "G_range": [75, 255], "B_range": [75, 255], "thickness_range": [2, 13], "opacity_range": [0.5, 1.0], "infill_probability": 0.75}],
-        [False, defect_generators.add_gaussian_noise, {"defect_class": 0, "mean": 0, "var": 0.01}],
-        [True, defect_generators.add_salt_and_pepper_noise, {"defect_class": 0, "amount": 0.015, "s_vs_p": 0.5, "dimension_range": [0.1, 0.3]}],        
-        [True, defect_generators.draw_ellipse_on_frame, {"defect_class": 0, "R_range": [75, 255], "G_range": [75, 255], "B_range": [75, 255], "angle_range": [0, 360], "axes_length_range": [10, 100], "thickness_range": [3, 10], "opacity_range": [0.4, 1.0]}],
-        [False, defect_generators.add_blurred_region, {"defect_class": 0, "kernel_size_range": [5, 31]}],
-        [True, defect_generators.add_scratch_on_frame, {"defect_class": 0, "num_lines": 5, "length_range": [30, 150], "thickness_range": [3, 10], "color": (random.randint(75, 255), random.randint(75, 255), random.randint(75, 255))}],
-        [True, defect_generators.add_watermark_text, {"defect_class": 0, "text_length": 10, "font_scale": 2, "thickness": 3, "opacity": 0.3}],
-        [False, defect_generators.add_lens_flare, {"defect_class": 0, "flare_center": None, "radius_range": [50, 150], "opacity_range": [0.1, 0.5]}],
-        [False, defect_generators.add_shadow, {"defect_class": 0, "top_left_ratio": (0.2, 0.2), "bottom_right_ratio": (0.8, 0.8), "opacity": 0.5}],
-        [False, defect_generators.add_color_tint, {"defect_class": 0, "tint_color": (0, 255, 255), "opacity": 0.3}],
-        [True, defect_generators.add_crack_texture, {"defect_class": 0, "crack_image_path": "src_image/crack.png", "opacity_range": [0.7, 0.95], "size_percentage_range": [0.25, 0.4]}],
-        [False, defect_generators.add_dust_particles, {"defect_class": 0, "num_particles": 50, "size_range": [1, 5]}],
-        [False, defect_generators.add_fog_effect, {"defect_class": 0, "fog_density": 0.5}],
-    ]       
+        #[False, defect_generators.draw_rectangle_on_frame, {"defect_class": 0, "R_range": [75, 255], "G_range": [75, 255], "B_range": [75, 255], "thickness_range": [2, 13], "opacity_range": [0.5, 1.0], "infill_probability": 0.75}],
+        #[False, defect_generators.add_gaussian_noise, {"defect_class": 0, "mean": 0, "var": 0.01}],
+        [True, defect_generators.add_salt_and_pepper_noise, {"defect_class": 0, "amount": 0.09, "s_vs_p": 0.3, "dimension_range": [0.1, 0.3]}],        
+        #[False, defect_generators.draw_ellipse_on_frame, {"defect_class": 0, "R_range": [75, 255], "G_range": [75, 255], "B_range": [75, 255], "angle_range": [0, 360], "axes_length_range": [10, 100], "thickness_range": [3, 10], "opacity_range": [0.4, 1.0]}],
+        #[False, defect_generators.add_blurred_region, {"defect_class": 0, "kernel_size_range": [5, 31]}],
+        [True, defect_generators.add_scratch_on_frame, {"defect_class": 0, "num_lines": 2, "length_range": [20, 50], "thickness_range": [3, 7], "color": (random.randint(75, 255), random.randint(75, 255), random.randint(75, 255))}],
+        [True, defect_generators.add_watermark_text, {"defect_class": 0, "text_length": 10, "font_scale": 2, "thickness": 3, "opacity": 0.7, "R_range":[0, 255], "G_range":[0, 255], "B_range":[0, 255]}],
+        #[False, defect_generators.add_lens_flare, {"defect_class": 0, "flare_center": None, "radius_range": [50, 150], "opacity_range": [0.1, 0.5]}],
+        #[False, defect_generators.add_shadow, {"defect_class": 0, "top_left_ratio": (0.2, 0.2), "bottom_right_ratio": (0.8, 0.8), "opacity": 0.5}],
+        #[False, defect_generators.add_color_tint, {"defect_class": 0, "tint_color": (0, 255, 255), "opacity": 0.3}],
+        #[False, defect_generators.add_crack_texture, {"defect_class": 0, "crack_image_path": "src_image/crack.png", "opacity_range": [0.7, 0.95], "size_percentage_range": [0.25, 0.4]}],
+        [True, defect_generators.add_dust_particles, {"defect_class": 0, "num_particles_range": [10,50], "size_range": [1, 5]}],
+        #[False, defect_generators.add_fog_effect, {"defect_class": 0, "fog_density": 0.5}],
+        [True, defect_generators.draw_random_png_images, {"defect_class": 0, "random_images_folder_path": str(Path(__file__).resolve().parent / 'src_image' / 'lorem_ipsums') , "number_of_images_range": [1, 2], "opacity_range": [0.6, 0.95], "size_percentage_range": [0.05, 0.15]}],
+        [True, defect_generators.draw_random_png_images_with_circular_opacity, {"defect_class": 0, "random_images_folder_path": str(Path(__file__).resolve().parent / 'src_image' / 'lorem_ipsums') , "number_of_images_range": [1, 2], "opacity_range": [0.3, 0.7], "size_percentage_range": [0.1, 0.3]}],
+        [True, defect_generators.apply_wave_distortion, {"defect_class": 0, "amplitude_range": [5, 20], "wavelength_range": [10, 50], "phase_range": [0, np.pi * 2], "dimension_range": [0.1, 0.3]}],
+        [True, defect_generators.apply_twirl_distortion, {"defect_class": 0, "strength_range": [0.5, 2.0], "radius_range": [50, 150], "dimension_range": [0.1, 0.3]}],
+        [False, defect_generators.apply_concentric_warp_defect, {"defect_class": 0, "strength_range": [0.5, 2.0], "nradius_range": [0.05, 0.15], "dimension_range": [0.05, 0.15], "warp_type": "inward"}],
+        [True, defect_generators.apply_concentric_warp_defect, {"defect_class": 0, "strength_range": [0.5, 2.0], "nradius_range": [0.05, 0.15], "dimension_range": [0.05, 0.15], "warp_type": "outward"}],
+        [True, defect_generators.draw_concave_polygon_on_frame, {"defect_class": 0, "R_range": [75, 255], "G_range": [75, 255], "B_range": [75, 255], "thickness_range": [2, 13], "opacity_range": [0.5, 1.0], "num_vertices_range": [3, 25], "size_range": [10, 100], "infill_probability": 0.9}],
+        [True, defect_generators.sweep_copied_section_arbitrary, {"defect_class": 0, "sweep_range":[0.1, 0.3], "section_size_range":[0.05, 0.3], "num_steps_range":[5, 20]}],   
+    ]     
     ACTIVE_DEFECT_GENERATORS = [defect_generator for defect_generator in DEFECT_GENERATORS if defect_generator[0]]
 
     for _ in range(number_of_defects):
@@ -254,79 +262,85 @@ def detect_with_yolo(image_folder_path = None, model_path = None, is_verbose=Fal
     :param bbox_threshold_confidence: Confidence threshold for displaying bounding boxes.
     """
     # Initialize the YOLO model
-    image_folder_path = image_folder_path if image_folder_path else input("Enter the path to the folder containing images: ")
     model_path = model_path if model_path else input("Enter the path to the model to use: ")
-    
     YOLO_OBJECT = YOLO(model_path, verbose=is_verbose)
 
-    # Get list of image files in the folder
-    image_extensions = ('.png', '.jpg', '.jpeg')
-    image_files = [os.path.join(image_folder_path, f) for f in os.listdir(image_folder_path)
-                   if f.lower().endswith(image_extensions)]
+    while True:
+        # Get list of image files in the folder
+        image_folder_path = image_folder_path if image_folder_path else input("Enter the path to the folder containing images: ")
+        image_extensions = ('.png', '.jpg', '.jpeg')
+        image_files = [os.path.join(image_folder_path, f) for f in os.listdir(image_folder_path)
+                    if f.lower().endswith(image_extensions)]
 
-    if not image_files:
-        print(f"No images found in folder: {image_folder_path}")
-        return
+        if not image_files:
+            print(f"No images found in folder: {image_folder_path}")
+            return
 
-    for image_path in image_files:
-        frame = cv2.imread(image_path)
-        if frame is None:
-            print(f"Failed to read image {image_path}. Skipping.")
-            continue
-
-        # Perform detection
-        results = YOLO_OBJECT(frame, task="detection", verbose=is_verbose)
-
-        if not results:
-            print(f"No detections in image {image_path}")
-            continue
-
-        detections = results[0]
-
-        for detection in detections:
-            boxes = detection.boxes
-            box_cls_no = int(boxes.cls.cpu().numpy()[0])
-            box_cls_name = YOLO_OBJECT.names[box_cls_no]
-            box_conf = boxes.conf.cpu().numpy()[0]
-            box_xyxyn = boxes.xyxyn.cpu().numpy()[0]
-
-            if box_conf < bbox_threshold_confidence:
+        for image_path in image_files:
+            frame = cv2.imread(image_path)
+            if frame is None:
+                print(f"Failed to read image {image_path}. Skipping.")
                 continue
 
-            # Draw bounding box on the frame
-            x1 = int(box_xyxyn[0] * frame.shape[1])
-            y1 = int(box_xyxyn[1] * frame.shape[0])
-            x2 = int(box_xyxyn[2] * frame.shape[1])
-            y2 = int(box_xyxyn[3] * frame.shape[0])
+            # Perform detection
+            results = YOLO_OBJECT(frame, task="detection", verbose=is_verbose)
 
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
-            cv2.putText(frame, f"{box_cls_name}: {box_conf:.2f}", (x1, y1 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+            if not results:
+                print(f"No detections in image {image_path}")
+                continue
 
-            detection_dict = {
-                'bbox_class_name': box_cls_name,
-                'bbox_confidence': box_conf,
-                'normalized_bbox': [box_xyxyn[0], box_xyxyn[1], box_xyxyn[2], box_xyxyn[3]],
-                'keypoints': None
-            }
-            print(f"Image: {image_path}, Detection: {detection_dict}")
+            detections = results[0]
 
-        # Display the image with detections
-        cv2.imshow("Detection", frame)
-        print(f"Press any key to proceed to the next image or 'q' to quit.")
-        key = cv2.waitKey(0) & 0xFF
-        if key == ord('q'):
+            for detection in detections:
+                boxes = detection.boxes
+                box_cls_no = int(boxes.cls.cpu().numpy()[0])
+                box_cls_name = YOLO_OBJECT.names[box_cls_no]
+                box_conf = boxes.conf.cpu().numpy()[0]
+                box_xyxyn = boxes.xyxyn.cpu().numpy()[0]
+
+                if box_conf < bbox_threshold_confidence:
+                    continue
+
+                # Draw bounding box on the frame
+                x1 = int(box_xyxyn[0] * frame.shape[1])
+                y1 = int(box_xyxyn[1] * frame.shape[0])
+                x2 = int(box_xyxyn[2] * frame.shape[1])
+                y2 = int(box_xyxyn[3] * frame.shape[0])
+
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                cv2.putText(frame, f"{box_cls_name}: {box_conf:.2f}", (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
+                detection_dict = {
+                    'bbox_class_name': box_cls_name,
+                    'bbox_confidence': box_conf,
+                    'normalized_bbox': [box_xyxyn[0], box_xyxyn[1], box_xyxyn[2], box_xyxyn[3]],
+                    'keypoints': None
+                }
+                print(f"Image: {image_path}, Detection: {detection_dict}")
+
+            # Display the image with detections
+            cv2.imshow("Detection", frame)
+            print(f"Press any key to proceed to the next image or 'q' to quit.")
+            key = cv2.waitKey(0) & 0xFF
+            if key == ord('q'):
+                break
+
+        cv2.destroyAllWindows()
+        print(f"Detection completed for all images in folder: {image_folder_path}.")
+        should_continue = input("Do you want to continue with another folder? (y/n): ")
+        if should_continue != 'y':
             break
+        image_folder_path = None # so that the the folder path is asked again
 
-    cv2.destroyAllWindows()
-     
 if __name__ == "__main__":
-    task = input("Do you want to train or inference? (train/inference): ")
-    if task == "train":        
+    task = input("What do you want? (dataset/train/inference): ")
+    if task == "dataset":        
         recreate_dataset_folder(dataset_folder_name = DATASET_FOLDER_NAME)
         recreate_dataset_images_and_labels(dataset_folder_name = DATASET_FOLDER_NAME, number_of_defects = NUMBER_OF_DEFECTS, defects_per_image_range = DEFECTS_PER_IMAGE_RANGE, desired_image_size = DESIRED_IMAGE_SIZE, image_zoom_region = IMAGE_ZOOM_REGION)
+    elif task == "train": 
         train_yolo_model(dataset_folder_name = DATASET_FOLDER_NAME)
     elif task == "inference":
-        detect_with_yolo(is_verbose = False, bbox_threshold_confidence = 0.5)
+        detect_with_yolo(is_verbose = False, bbox_threshold_confidence = 0.05)
 
 
