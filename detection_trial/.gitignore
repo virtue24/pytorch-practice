@@ -1,0 +1,10 @@
+dataset/*
+base_images/*
+training_results/*
+*yolov8n.pt
+src_image/*
+*.cache
+
+!base_images/.gitkeep
+!training_results/.gitkeep
+!src_image/.gitkeep
