@@ -1,5 +1,8 @@
 dataset/*
 base_images/*
+base_test_defect_images/*
+base_test_good_images/*
+
 training_results/*
 *yolov8n.pt
 src_image/*
@@ -8,3 +11,5 @@ src_image/*
 !base_images/.gitkeep
 !training_results/.gitkeep
 !src_image/.gitkeep
+!base_test_defect_images/.gitkeep
+!base_test_good_images/.gitkeep

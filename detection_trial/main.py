@@ -58,15 +58,29 @@ def recreate_dataset_folder(dataset_folder_name = None):
         # Add more classes if needed
     os.mkdir(os.path.join(dataset_folder_name, "images"))
     os.mkdir(os.path.join(dataset_folder_name, "labels"))
+    os.mkdir(os.path.join(dataset_folder_name, "test_defect_images"))
+    os.mkdir(os.path.join(dataset_folder_name, "test_good_images"))
+    
     with open(os.path.join(dataset_folder_name, "labels", "classes.txt"), "w") as f:
         f.write("defect")
         # Add more classes if needed
 
 def recreate_dataset_images_and_labels(dataset_folder_name=None, number_of_defects:int = 100, defects_per_image_range = [1,5], desired_image_size = (640, 640), image_zoom_region = [0.0, 0.0, 1.0, 1.0]):
     BASE_IMAGES_FOLDER_PATH = Path(__file__).resolve().parent / 'base_images'
+    BASE_TEST_DEFECT_IMAGES_FOLDER_PATH = Path(__file__).resolve().parent / 'base_test_defect_images'  
+    DATASET_TEST_DEFECT_IMAGES_DATASET_FOLDER_PATH = Path(__file__).resolve().parent / dataset_folder_name / 'test_defect_images'  
+    BASE_TEST_GOOD_IMAGES_FOLDER_PATH = Path(__file__).resolve().parent / 'base_test_good_images'
+    DATASET_TEST_GOOD_IMAGES_DATASET_FOLDER_PATH = Path(__file__).resolve().parent / dataset_folder_name / 'test_good_images'
+
     base_image_paths = [BASE_IMAGES_FOLDER_PATH / f for f in os.listdir(BASE_IMAGES_FOLDER_PATH) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
     base_image_paths = [str(image_path.resolve()) for image_path in base_image_paths]
 
+    base_test_defect_image_paths = [BASE_TEST_DEFECT_IMAGES_FOLDER_PATH / f for f in os.listdir(BASE_TEST_DEFECT_IMAGES_FOLDER_PATH) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+    base_test_defect_image_paths = [str(image_path.resolve()) for image_path in base_test_defect_image_paths]
+
+    base_test_good_image_paths = [BASE_TEST_GOOD_IMAGES_FOLDER_PATH / f for f in os.listdir(BASE_TEST_GOOD_IMAGES_FOLDER_PATH) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+    base_test_good_image_paths = [str(image_path.resolve()) for image_path in base_test_good_image_paths]
+    
     # crop and resize the base images
     base_images = [cv2.imread(image_path) for image_path in base_image_paths]
     processed_images = []
@@ -88,6 +102,46 @@ def recreate_dataset_images_and_labels(dataset_folder_name=None, number_of_defec
         processed_images.append(resized_image)
     base_images = processed_images
 
+    # crop and resize the test defect images
+    test_defect_images = [cv2.imread(image_path) for image_path in base_test_defect_image_paths]
+    for image in test_defect_images:
+        height, width = image.shape[:2]
+        
+        x_min = int(width * IMAGE_ZOOM_REGION[0])
+        y_min = int(height * IMAGE_ZOOM_REGION[1])
+        x_max = int(width * IMAGE_ZOOM_REGION[2])
+        y_max = int(height * IMAGE_ZOOM_REGION[3])
+        
+        x_min = max(0, min(x_min, width - 1))
+        y_min = max(0, min(y_min, height - 1))
+        x_max = max(0, min(x_max, width))
+        y_max = max(0, min(y_max, height))
+
+        cropped_image = image[y_min:y_max, x_min:x_max]
+        resized_image = cv2.resize(cropped_image, DESIRED_IMAGE_SIZE)
+
+        cv2.imwrite(os.path.join(DATASET_TEST_DEFECT_IMAGES_DATASET_FOLDER_PATH, str(uuid.uuid4())), resized_image)
+    
+    # crop and resize the test good images
+    test_good_images = [cv2.imread(image_path) for image_path in base_test_good_image_paths]
+    for image in test_good_images:
+        height, width = image.shape[:2]
+        
+        x_min = int(width * IMAGE_ZOOM_REGION[0])
+        y_min = int(height * IMAGE_ZOOM_REGION[1])
+        x_max = int(width * IMAGE_ZOOM_REGION[2])
+        y_max = int(height * IMAGE_ZOOM_REGION[3])
+        
+        x_min = max(0, min(x_min, width - 1))
+        y_min = max(0, min(y_min, height - 1))
+        x_max = max(0, min(x_max, width))
+        y_max = max(0, min(y_max, height))
+
+        cropped_image = image[y_min:y_max, x_min:x_max]
+        resized_image = cv2.resize(cropped_image, DESIRED_IMAGE_SIZE)
+
+        cv2.imwrite(os.path.join(DATASET_TEST_GOOD_IMAGES_DATASET_FOLDER_PATH, str(uuid.uuid4()), resized_image))       
+              
     # add background images to the dataset
     for image in base_images:
         paste_image_and_label(image = image, name_prefix = "background", label = "", dataset_folder_name = dataset_folder_name)
@@ -190,35 +244,82 @@ def train_yolo_model(dataset_folder_name = None):
         
     )
 
-def detect_with_yolo(is_verbose = False, bbox_threshold_confidence = 0.5):
-    MODEL_PATH = input("Enter the path to the YOLO model file: ")
-    YOLO_OBJECT = YOLO( MODEL_PATH, verbose=is_verbose)
+def detect_with_yolo(image_folder_path = None, model_path = None, is_verbose=False, bbox_threshold_confidence=0.5):
+    """
+    Processes images in the given folder using the YOLO model and displays detections.
 
-    while True:
-        frame = cv2.imread(input("Enter the path to the image file: "))
-        detections = YOLO_OBJECT(frame, task = "detection", verbose= is_verbose)[0]
-        
-        for detection in detections: # Each detection is a single person
+    :param image_folder_path: Path to the folder containing images.
+    :param model_path: Path to the YOLO model file.
+    :param is_verbose: If True, prints additional information.
+    :param bbox_threshold_confidence: Confidence threshold for displaying bounding boxes.
+    """
+    # Initialize the YOLO model
+    image_folder_path = image_folder_path if image_folder_path else input("Enter the path to the folder containing images: ")
+    model_path = model_path if model_path else input("Enter the path to the model to use: ")
+    
+    YOLO_OBJECT = YOLO(model_path, verbose=is_verbose)
 
+    # Get list of image files in the folder
+    image_extensions = ('.png', '.jpg', '.jpeg')
+    image_files = [os.path.join(image_folder_path, f) for f in os.listdir(image_folder_path)
+                   if f.lower().endswith(image_extensions)]
+
+    if not image_files:
+        print(f"No images found in folder: {image_folder_path}")
+        return
+
+    for image_path in image_files:
+        frame = cv2.imread(image_path)
+        if frame is None:
+            print(f"Failed to read image {image_path}. Skipping.")
+            continue
+
+        # Perform detection
+        results = YOLO_OBJECT(frame, task="detection", verbose=is_verbose)
+
+        if not results:
+            print(f"No detections in image {image_path}")
+            continue
+
+        detections = results[0]
+
+        for detection in detections:
             boxes = detection.boxes
-            box_cls_no = int(boxes.cls.cpu().numpy()[0])       
-            box_cls_name = YOLO_OBJECT.names[box_cls_no]  
+            box_cls_no = int(boxes.cls.cpu().numpy()[0])
+            box_cls_name = YOLO_OBJECT.names[box_cls_no]
             box_conf = boxes.conf.cpu().numpy()[0]
             box_xyxyn = boxes.xyxyn.cpu().numpy()[0]
-            if box_conf < bbox_threshold_confidence: continue
 
-            cv2.rectangle(frame, (int(box_xyxyn[0]*frame.shape[1]), int(box_xyxyn[1]*frame.shape[0])), (int(box_xyxyn[2]*frame.shape[1]), int(box_xyxyn[3]*frame.shape[0])), (0,0,255), 2)
-            detection_dict = {'bbox_class_name': box_cls_name, "bbox_confidence": box_conf, "normalized_bbox": [box_xyxyn[0], box_xyxyn[1], box_xyxyn[2], box_xyxyn[3]], 'keypoints': None}
-            print(detection_dict)
-        
+            if box_conf < bbox_threshold_confidence:
+                continue
+
+            # Draw bounding box on the frame
+            x1 = int(box_xyxyn[0] * frame.shape[1])
+            y1 = int(box_xyxyn[1] * frame.shape[0])
+            x2 = int(box_xyxyn[2] * frame.shape[1])
+            y2 = int(box_xyxyn[3] * frame.shape[0])
+
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+            cv2.putText(frame, f"{box_cls_name}: {box_conf:.2f}", (x1, y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
+            detection_dict = {
+                'bbox_class_name': box_cls_name,
+                'bbox_confidence': box_conf,
+                'normalized_bbox': [box_xyxyn[0], box_xyxyn[1], box_xyxyn[2], box_xyxyn[3]],
+                'keypoints': None
+            }
+            print(f"Image: {image_path}, Detection: {detection_dict}")
+
+        # Display the image with detections
         cv2.imshow("Detection", frame)
+        print(f"Press any key to proceed to the next image or 'q' to quit.")
         key = cv2.waitKey(0) & 0xFF
-        if key == ord("q"):
+        if key == ord('q'):
             break
-        cv2.destroyAllWindows()
 
-
-        
+    cv2.destroyAllWindows()
+     
 if __name__ == "__main__":
     task = input("Do you want to train or inference? (train/inference): ")
     if task == "train":        
