@@ -3,7 +3,7 @@ import open_clip
 import cv2
 from sentence_transformers import util
 from PIL import Image
-import uuid
+import uuid, os, random
 
 # image processing model
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -21,42 +21,67 @@ def generateScore(test_img, data_img):
     score = round(float(cos_scores[0][0])*100, 2)
     return score
 
-THRESHOLD_SCORE = 85
-IMAGE_SIZE = (240, 240)
-GRID_FORM = (4, 4)
-GRID_SIZE = (IMAGE_SIZE[0]//GRID_FORM[0], IMAGE_SIZE[1]//GRID_FORM[1])
+THRESHOLD_SCORE = 52.5
+NUMBER_OF_GROUND_TRUTH_IMAGES = 32
+IMAGE_SIZE = (360, 360)
+GRID_FORM = (9, 9)
+GRID_SIZE = (IMAGE_SIZE[0] // GRID_FORM[0], IMAGE_SIZE[1] // GRID_FORM[1])
 
 ground_truth_sections = {}
 
-ground_truth_0 = cv2.resize(cv2.imread("test_good_images/6dd496b1-2036-4fec-8ccb-3f4c53df00dd.jpg", cv2.IMREAD_UNCHANGED), IMAGE_SIZE)
-ground_truth_1 = cv2.resize(cv2.imread("test_good_images/7ecd279b-3121-41b5-b244-43b640a3e7db.jpg", cv2.IMREAD_UNCHANGED), IMAGE_SIZE)
-ground_truth_2 = cv2.resize(cv2.imread("test_good_images/d340a2e0-4659-4a0c-a355-2d91ffe25fb8.jpg", cv2.IMREAD_UNCHANGED), IMAGE_SIZE)
-ground_truth_3 = cv2.resize(cv2.imread("test_good_images/fcba0125-3d64-41c1-8011-ec33b54614d5.jpg", cv2.IMREAD_UNCHANGED), IMAGE_SIZE)
+ground_truth_paths = [os.path.join("test_good_images", file_name) for file_name in os.listdir("test_good_images") if file_name.endswith(".png")]
+ground_truth_paths = ground_truth_paths[:NUMBER_OF_GROUND_TRUTH_IMAGES]
+ground_truth_images = [cv2.imread(file_path, cv2.IMREAD_UNCHANGED) for file_path in ground_truth_paths]
 
 # Fix index calculation in grid
-for ground_truth_image in [ground_truth_0, ground_truth_1, ground_truth_2, ground_truth_3]:
-    for section_idx in range(GRID_FORM[0]*GRID_FORM[1]):
+for ground_truth_image in ground_truth_images:
+    for section_idx in range(GRID_FORM[0] * GRID_FORM[1]):
         if section_idx not in ground_truth_sections:
             ground_truth_sections[section_idx] = []
-        
+
         x = section_idx % GRID_FORM[1]  # Use columns for mod
         y = section_idx // GRID_FORM[1]  # Use rows for division
-        
+
         # Append the sliced sections
         ground_truth_sections[section_idx].append(
-            ground_truth_image[y*GRID_SIZE[0]:(y+1)*GRID_SIZE[0], x*GRID_SIZE[1]:(x+1)*GRID_SIZE[1]]
+            ground_truth_image[y * GRID_SIZE[0]:(y + 1) * GRID_SIZE[0], x * GRID_SIZE[1]:(x + 1) * GRID_SIZE[1]]
         )
 
-# # Display ground truth sections
-# for section_index, section_images in ground_truth_sections.items():
-#     for ground_truth_section in section_images:
-#         cv2.imshow("Ground Truth", ground_truth_section)
-#         cv2.waitKey(0)
-#         cv2.destroyAllWindows()
+# calculate mean threshold by comparing all ground truth images
+mean_threshold = 0
+minimum_threshold = 100
+counter = 0
+PASS_PROBABILITY = 0.98
+for section_index, ground_truth_section_list in ground_truth_sections.items():
+    ground_truth_section = ground_truth_section_list[0]  # Use the first section in the list
 
-while True:
+    max_pooled_similarity_score = 0
+    for other_ground_truth_section in ground_truth_section_list[1:]:
+        if random.random() < PASS_PROBABILITY:
+            continue
 
-    test_image = cv2.imread(input("Enter the path of test image: "), cv2.IMREAD_UNCHANGED)
+        score = generateScore(ground_truth_section, other_ground_truth_section)
+        if score > max_pooled_similarity_score:
+            max_pooled_similarity_score = score
+
+    if max_pooled_similarity_score < minimum_threshold and max_pooled_similarity_score != 0:
+        minimum_threshold = max_pooled_similarity_score
+        mean_threshold += max_pooled_similarity_score
+        counter += 1
+
+    print(f"Max score: {max_pooled_similarity_score} | counter: {counter}")
+
+if counter > 0:
+    mean_threshold /= counter
+else:
+    mean_threshold = 0  # Avoid division by zero if no sections were processed
+
+print(f"Mean threshold: {mean_threshold}")
+THRESHOLD_SCORE = minimum_threshold
+
+for test_image_path in [os.path.join("test_defect_images", file_name) for file_name in os.listdir("test_defect_images") if file_name.endswith(".png")]:
+
+    test_image = cv2.imread(test_image_path, cv2.IMREAD_UNCHANGED)
     test_image = cv2.resize(test_image, IMAGE_SIZE)  # Ensure the test image is resized
 
     # Split the test image into sections
@@ -65,12 +90,14 @@ while True:
         for j in range(GRID_FORM[1]):
             test_image_sections.append(test_image[i*GRID_SIZE[0]:(i+1)*GRID_SIZE[0], j*GRID_SIZE[1]:(j+1)*GRID_SIZE[1]])
 
-   # Compare the test image sections with the ground truth sections
+    # Compare the test image sections with the ground truth sections
     below_threshold_sections = []
     for section_index, ground_truth_section_list in ground_truth_sections.items():
         max_pooled_similarity_score = 0
         test_image_section = test_image_sections[section_index]
-        
+        cv2.imshow("Test Image Section", cv2.resize(test_image_section, IMAGE_SIZE))
+        cv2.waitKey(1)
+
         # Compare the current test section with all ground truth sections
         for ground_truth_section in ground_truth_section_list:
             similarity_score = generateScore(test_image_section, ground_truth_section)
@@ -97,6 +124,6 @@ while True:
         cv2.rectangle(test_image, (x*GRID_SIZE[1], y*GRID_SIZE[0]), ((x+1)*GRID_SIZE[1], (y+1)*GRID_SIZE[0]), (0, 0, 255), 2)
 
     cv2.imshow("Test Image", test_image)
-    cv2.waitKey(0)
+    cv2.waitKey(10000)
     cv2.imwrite(f"results/{uuid.uuid4()}.jpg", test_image)
     cv2.destroyAllWindows()
