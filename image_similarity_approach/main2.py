@@ -55,6 +55,7 @@ for ground_truth_image in [ground_truth_0, ground_truth_1, ground_truth_2, groun
 #         cv2.destroyAllWindows()
 
 while True:
+
     test_image = cv2.imread(input("Enter the path of test image: "), cv2.IMREAD_UNCHANGED)
     test_image = cv2.resize(test_image, IMAGE_SIZE)  # Ensure the test image is resized
 
@@ -74,7 +75,11 @@ while True:
         for ground_truth_section in ground_truth_section_list:
             similarity_score = generateScore(test_image_section, ground_truth_section)
             print(f"    {section_index} | similarity Score: {round(similarity_score,2)}")
-            
+            if similarity_score >= THRESHOLD_SCORE:
+                max_pooled_similarity_score = similarity_score
+                print(f" Already above threshold, skipping the rest")
+                break
+
             # Keep track of the highest similarity score found
             if similarity_score > max_pooled_similarity_score:
                 max_pooled_similarity_score = similarity_score
@@ -93,5 +98,5 @@ while True:
 
     cv2.imshow("Test Image", test_image)
     cv2.waitKey(0)
-    cv2.imwrite(f"test_images/{uuid.uuid4()}.jpg", test_image)
+    cv2.imwrite(f"results/{uuid.uuid4()}.jpg", test_image)
     cv2.destroyAllWindows()
