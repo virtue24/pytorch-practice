@@ -2,3 +2,4 @@ base_test_defect_images/*
 base_test_good_images/*
 test_defect_images/*
 test_good_images/*
+results/*
