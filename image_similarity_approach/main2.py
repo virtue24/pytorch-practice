@@ -1,3 +1,8 @@
+# https://medium.com/scrapehero/exploring-image-similarity-approaches-in-python-b8ca0a3ed5a3
+# !pip install git+https://github.com/openai/CLIP.git
+# !pip install open_clip_torch
+# !pip install sentence_transformers
+
 import torch
 import open_clip
 import cv2
@@ -35,6 +40,7 @@ ground_truth_images = [cv2.imread(file_path, cv2.IMREAD_UNCHANGED) for file_path
 
 # Fix index calculation in grid
 for GRID_FORM in [(3, 3), (4, 4), (5, 5), (6,6), (7,7), (8,8)]:
+    ground_truth_sections = {}  # Reset the ground truth sections for the next test image
     GRID_SIZE = (IMAGE_SIZE[0] // GRID_FORM[0], IMAGE_SIZE[1] // GRID_FORM[1])
 
     for ground_truth_image in ground_truth_images:
@@ -129,4 +135,3 @@ for GRID_FORM in [(3, 3), (4, 4), (5, 5), (6,6), (7,7), (8,8)]:
         cv2.waitKey(10000)
         cv2.imwrite(f"results/g_{GRID_FORM[0]}_{uuid.uuid4()}.jpg", test_image)
         cv2.destroyAllWindows()
-        ground_truth_sections = {}  # Reset the ground truth sections for the next test image
